@@ -1,4 +1,4 @@
-#include <expose_pgtbl.h>
+#include <linux/expose_pgtbl.h>
 
 SYSCALL_DEFINE1(get_pagetable_layout, struct pagetable_layout_info __user *, pgtbl_info)
 {
