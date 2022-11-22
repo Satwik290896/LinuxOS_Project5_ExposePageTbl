@@ -362,6 +362,9 @@
 438	common	pidfd_getfd		sys_pidfd_getfd
 439	common	faccessat2		sys_faccessat2
 440	common	process_madvise		sys_process_madvise
+441	64	get_pagetable_layout		sys_get_pagetable_layout
+442	64	expose_page_table		sys_expose_page_table
+443	64	get_pa_contents		sys_get_pa_contents
 
 #
 # Due to a historical design error, certain syscalls are numbered differently
