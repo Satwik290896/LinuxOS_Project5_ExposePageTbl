@@ -34,5 +34,6 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 
 SYSCALL_DEFINE1(get_pa_contents, long, phys_addr)
 {
-	return 0;
+	/* This may need to be tested and revised after 442 is done for further testing */
+	return *((int *)phys_to_virt(phys_addr));
 }
