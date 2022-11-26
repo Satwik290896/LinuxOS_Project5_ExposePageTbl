@@ -102,9 +102,9 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		#ifdef CONFIG_ARM64
 		map_pfn = (pmd_val(READ_ONCE(*map_pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
 		#else
-		map_pfn = pmd_pfn(map_pmd);
+		map_pfn = pmd_pfn(*map_pmd);
 		#endif
-
+		
 		result = remap_pfn_range(to_vma, PAGE_ALIGN(map_to_addr),
 					 map_pfn, PAGE_SIZE, flags);
 		if (result != 0)
