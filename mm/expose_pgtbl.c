@@ -97,8 +97,8 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 
 
 	for (i = 0; i < BUF_SIZE; i++) {
-		buf[i].begin_vaddr	= virtual_add_begin + i*vadd_iter;
-		buf[i].end_vaddr	= virtual_add_end + i*vadd_iter;
+		buf[i].begin_vaddr	= ((i<<12) + virtual_add_begin) << 12;
+		buf[i].end_vaddr	= ((i<<12) + virtual_add_end) << 12;
 		buf[i].fake_pgd		= 0;
 		buf[i].fake_p4ds	= 0;
 		buf[i].fake_puds	= 0;
