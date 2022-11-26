@@ -8,6 +8,16 @@
 #define vadd_iter	0x1000
 #define BUF_SIZE	4096
 
+/*struct expose_pgtbl_args {
+	unsigned long fake_pgd;
+	unsigned long fake_p4ds;
+	unsigned long fake_puds;
+	unsigned long fake_pmds;
+	unsigned long page_table_addr;
+	unsigned long begin_vaddr;
+	unsigned long end_vaddr;
+};*/
+
 
 struct mm_struct *get_task_mm_expose(struct task_struct *task)
 {
@@ -64,7 +74,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	
 	if (!args)
 		return -EINVAL;
-
+	
 
 
 
@@ -76,27 +86,25 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		return -ENOMEM;
 
 
+	rcu_read_lock();
+	p_task = (pid == -1) ? current : find_task_by_vpid(pid);
+	if (!p_task) {
+		rcu_read_unlock();
+		return -ESRCH;
+	}
+	get_task_struct(p_task);
+	rcu_read_unlock();
 
-
-
-	if (pid == -1)
-		p_task = task_pid_nr(current);
-	else
-		p_task = get_pid_task(pid, PIDTYPE_PID);
-	
-	if (!p_task)
-		return -EINVAL;
-	
 	mm = get_task_mm_expose(p_task);
 	
 	if (!mm)
-		return -EINVAL;
+		return -ESRCH;
 
 
 
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		
-		if (i < 4096) {
+		if (i < BUF_SIZE) {
 		
 		buf[i].begin_vaddr	= vma->vm_start;
 		buf[i].end_vaddr	= vma->vm_end;
