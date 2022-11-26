@@ -67,7 +67,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	struct mm_struct *from_mm;
 	struct mm_struct *to_mm;
 	struct vm_area_struct *from_vma;
-	struct vm_area_struct *to_mm;
+	struct vm_area_struct *to_vma;
 	int result = 0;
 
 	if (!args)
