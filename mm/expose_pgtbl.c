@@ -6,7 +6,7 @@
 
 #define OFFSET_MAX	0xFFF
 #define vadd_iter	0x1000
-#define BUF_SIZE	0x1000000000
+#define BUF_SIZE	4096
 
 
 struct mm_struct *get_task_mm_expose(struct task_struct *task)
@@ -60,6 +60,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	u64 virtual_add_begin = 0;
 	u64 virtual_add_end = OFFSET_MAX;
 	u64 i = 0;
+	struct vm_area_struct *vma;
 	
 	if (!args)
 		return -EINVAL;
@@ -93,19 +94,19 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 
 
 
-
-
-
-	for (i = 0; i < BUF_SIZE; i++) {
-		buf[i].begin_vaddr	= ((i<<12) + virtual_add_begin) << 12;
-		buf[i].end_vaddr	= ((i<<12) + virtual_add_end) << 12;
+	for (vma = mm->mmap; vma; vma = vma->vm_next) {
+		
+		if (i < 4096) {
+		
+		buf[i].begin_vaddr	= vma->vm_start;
+		buf[i].end_vaddr	= vma->vm_end;
 		buf[i].fake_pgd		= 0;
 		buf[i].fake_p4ds	= 0;
 		buf[i].fake_puds	= 0;
 		buf[i].fake_pmds	= 0;
 		buf[i].page_table_addr	= 0;
 		
-		u64 addr = i << 24; /*12 offset bits, 12 irrelevant bits*/
+		u64 addr = vma->vm_start;
 		
 		pgd_t *pgd		= pgd_offset(mm, addr);
 		
@@ -131,15 +132,18 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 				}
 			}
 		}
+		}
 		
+		i++;
 	}
+
 	
 	if (copy_to_user(args, buf, BUF_SIZE*sizeof(struct expose_pgtbl_args)))
 		return -EFAULT;
 	
 	kfree(buf);
 	
-	return 0;
+	return i;
 }
 
 SYSCALL_DEFINE1(get_pa_contents, long, phys_addr)
