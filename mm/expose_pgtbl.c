@@ -93,17 +93,20 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	while (PAGE_ALIGN(map_from_addr) < PAGE_ALIGN(local_args.end_vaddr)) {
 		/* walk the tables to get the physical PFN to map from */
 		/* TODO: should we use the fake tables for this? */
-		unsigned long pfn;
-		pgd_t *pgd = pgd_offset(from_mm, map_from_addr);
-		p4d_t *p4d = p4d_offset(pgd, map_from_addr);
-		pud_t *pud = pud_offset(p4d, map_from_addr);
-		pmd_t *pmd = pmd_offset(pud, map_from_addr);
+		unsigned long map_pfn;
+		pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
+		p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
+		pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
+		pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
 
-		/* if (arm): */ pfn = (pmd_val(READ_ONCE(*pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
-		/* else if: pfn = pmd_pfn(pmd); */
+		#ifdef CONFIG_ARM64
+		map_pfn = (pmd_val(READ_ONCE(*map_pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
+		#else
+		map_pfn = pmd_pfn(map_pmd);
+		#endif
 
 		result = remap_pfn_range(to_vma, PAGE_ALIGN(map_to_addr),
-					 pfn, PAGE_SIZE, flags);
+					 map_pfn, PAGE_SIZE, flags);
 		if (result != 0)
 			return result;
 		
