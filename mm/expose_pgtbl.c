@@ -1,5 +1,30 @@
 #include <linux/syscalls.h>
+#include <linux/export.h>
+#include <linux/sched/mm.h>
 #include <linux/expose_pgtbl.h>
+
+
+#define OFFSET_MAX	0xFFF
+#define vadd_iter	0x1000
+#define BUF_SIZE	0x1000000000
+
+
+struct mm_struct *get_task_mm_expose(struct task_struct *task)
+{
+	struct mm_struct *mm;
+
+	task_lock(task);
+	mm = task->mm;
+	if (mm) {
+		if (task->flags & PF_KTHREAD)
+			mm = NULL;
+		else
+			mmget(mm);
+	}
+	task_unlock(task);
+	return mm;
+}
+
 
 /*
  * Investigate the page table layout.
@@ -29,11 +54,97 @@ SYSCALL_DEFINE1(get_pagetable_layout, struct pagetable_layout_info __user *, pgt
 
 SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *, args)
 {
+	struct task_struct *p_task;
+	struct mm_struct *mm;
+	struct expose_pgtbl_args *buf;
+	u64 virtual_add_begin = 0;
+	u64 virtual_add_end = OFFSET_MAX;
+	u64 i = 0;
+	
+	if (!args)
+		return -EINVAL;
+
+
+
+
+
+	/* kmalloc because size is large */
+	buf = kmalloc(BUF_SIZE*sizeof(struct expose_pgtbl_args), GFP_KERNEL);
+	
+	if (!buf)
+		return -ENOMEM;
+
+
+
+
+
+	if (pid == -1)
+		p_task = task_pid_nr(current);
+	else
+		p_task = get_pid_task(pid, PIDTYPE_PID);
+	
+	if (!p_task)
+		return -EINVAL;
+	
+	mm = get_task_mm_expose(p_task);
+	
+	if (!mm)
+		return -EINVAL;
+
+
+
+
+
+
+	for (i = 0; i < BUF_SIZE; i++) {
+		buf[i].begin_vaddr	= virtual_add_begin + i*vadd_iter;
+		buf[i].end_vaddr	= virtual_add_end + i*vadd_iter;
+		buf[i].fake_pgd		= 0;
+		buf[i].fake_p4ds	= 0;
+		buf[i].fake_puds	= 0;
+		buf[i].fake_pmds	= 0;
+		buf[i].page_table_addr	= 0;
+		
+		u64 addr = i << 24; /*12 offset bits, 12 irrelevant bits*/
+		
+		pgd_t *pgd		= pgd_offset(mm, addr);
+		
+		if (!pgd) {
+			buf[i].fake_pgd	= pgd->pgd;
+			p4d_t *p4d	= p4d_offset(pgd, addr);
+			
+			if (!p4d) {
+				buf[i].fake_p4ds= p4d->pgd.pgd;
+				pud_t *pud	= pud_offset(p4d, addr);
+				
+				if (!pud) {
+					buf[i].fake_puds= pud->pud;
+					pmd_t *pmd	= pmd_offset(pud, addr);
+				
+					if (!pmd) {
+						buf[i].fake_pmds= pmd->pmd;
+						pte_t *pte	= pte_offset_map(pmd, addr);
+						
+						if (!pte)
+							buf[i].page_table_addr	= pte->pte;
+					}
+				}
+			}
+		}
+		
+	}
+	
+	if (copy_to_user(args, buf, BUF_SIZE*sizeof(struct expose_pgtbl_args)))
+		return -EFAULT;
+	
+	kfree(buf);
+	
 	return 0;
 }
 
 SYSCALL_DEFINE1(get_pa_contents, long, phys_addr)
 {
 	/* This may need to be tested and revised after 442 is done for further testing */
-	return *((int *)phys_to_virt(phys_addr));
+	return *((int *)__va(phys_addr));
+	//return 0;
 }
