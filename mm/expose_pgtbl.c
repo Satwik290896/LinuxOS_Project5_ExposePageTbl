@@ -98,9 +98,8 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		pmd_t *pmd = pmd_offset(pud, map_from_addr);
 		unsigned long pfn;
 
-		/* if (arm): */
-		pfn = (pmd_val(READ_ONCE(*pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
-		/* else if: */
+		/* if (arm): */ pfn = (pmd_val(READ_ONCE(*pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
+		/* else if: pfn = pmd_pfn(pmd); */
 
 		result = remap_pfn_range(to_vma, PAGE_ALIGN(map_to_addr),
 					 pfn, PAGE_SIZE, flags);
