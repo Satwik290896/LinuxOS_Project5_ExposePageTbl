@@ -38,7 +38,7 @@ SYSCALL_DEFINE1(get_pagetable_layout, struct pagetable_layout_info __user *, pgt
 {
 	/*
 	 * if(!pgtbl_info)
-	 * 	return -EINVAL;
+	 *	return -EINVAL;
 	 */
 	struct pagetable_layout_info tmp;
 
