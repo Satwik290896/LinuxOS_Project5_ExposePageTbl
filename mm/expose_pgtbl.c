@@ -106,19 +106,13 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	map_to_addr = local_args.page_table_addr;
 	
 	p4d_e = p4d_alloc(to_mm, fake_pgd, map_to_addr);
+	p4d_e->pgd.pgd = local_args.fake_p4ds;
 	pud_e = pud_alloc(to_mm, p4d_e, map_to_addr);
+	pud_e->pud = local_args.fake_puds;
 	pmd_e = pmd_alloc(to_mm, pud_e, map_to_addr);
+	pmd_e->pmd = local_args.fake_pmds;
 	pte_e = pte_alloc_map(to_mm, pmd_e, map_to_addr);
-	
-	pud_e = pud_alloc(to_mm, fake_p4d, map_to_addr);
-	pmd_e = pmd_alloc(to_mm, pud_e, map_to_addr);
-	pte_e = pte_alloc_map(to_mm, pmd_e, map_to_addr);
-	
-	pmd_e = pmd_alloc(to_mm, fake_pud, map_to_addr);
-	pte_e = pte_alloc_map(to_mm, pmd_e, map_to_addr);
-	
-	pte_e = pte_alloc_map(to_mm, fake_pmd, map_to_addr);
-
+	pte_e->pte = map_to_addr;
 		
 
 	/* do the mapping from the VMA to page_table_addr*/
