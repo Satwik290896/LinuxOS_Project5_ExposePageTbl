@@ -72,12 +72,13 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	struct mm_struct *to_mm;
 	struct mm_struct *from_mm;
 	struct vm_area_struct *from_vma;
+	struct vm_area_struct *to_vma;
 	unsigned long map_from_addr, map_to_addr, map_begin_addr, map_end_addr, begin_page_table;
 	pgprot_t flags;
 	int result = 0;
 
 	unsigned long map_pfn;
-	unsigned long num_pmds, num_puds, num_pgds, tot_num_pages;
+	unsigned long num_pmds, num_puds, num_pgds, tot_num_pages, num_pages_rem;
 
 	if (!args)
 		return -EINVAL;
@@ -107,43 +108,53 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	map_end_addr = local_args.end_vaddr;
 	begin_page_table = local_args.page_table_addr;
 	
-	tot_num_pages = (map_end_addr >> PAGE_SHIFT - map_begin_addr>>PAGE_SHIFT) + 1;
-	num_pmds = (map_end_addr >> PMD_SHFT - map_begin_addr>>PMD_SHIFT) + 1;
-	num_puds = (map_end_addr >> PUD_SHFT - map_begin_addr>>PUD_SHIFT) + 1;
-	num_pgds = (map_end_addr >> PGD_SHFT - map_begin_addr>>PGD_SHIFT) + 1;
+	tot_num_pages = (map_end_addr >> PAGE_SHIFT) - (map_begin_addr>>PAGE_SHIFT) + 1;
+	num_pages_rem = tot_num_pages;
+	num_pmds = (map_end_addr >> PMD_SHIFT) - (map_begin_addr>>PMD_SHIFT) + 1;
+	num_puds = (map_end_addr >> PUD_SHIFT) - (map_begin_addr>>PUD_SHIFT) + 1;
+	num_pgds = 1;
 
 	to_vma = find_vma(to_mm, begin_page_table);
 	flags = to_vma->vm_page_prot;
 
 	
+	
+	
 	map_from_addr = map_begin_addr;
-	
-	pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
-	p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
-	pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
-	pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
-	
-	
-	
-	
-	unsigned long pte_i = pte_index(map_from_addr);
-	map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
 	map_to_addr = begin_page_table;
 	
-	unsigned long num_pages = (512 - pte_i);
+	/*Loop starts from here?*/
 	
-	if (num_pages > tot_num_pages)
-		num_pages = tot_num_pages;
+		/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
+		pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
+		p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
+		pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
+		pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
+		map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
 	
-	result = remap_pfn_range(to_vma, map_to_addr,
-				map_pfn, (num_pages*8), flags);
+		/*Find the pte index and compare with num_page_rem()*/
+		unsigned long pte_i = pte_index(map_from_addr);
+		unsigned long num_pages = (512 - pte_i);
+		if (num_pages > num_pages_rem)
+			num_pages = num_pages_rem;
 	
-	if (!result)
-		return result;
+	
+		/*remap_pfn_range()*/
+		result = remap_pfn_range(to_vma, map_to_addr, map_pfn, (num_pages*8), flags);
+		if (!result)
+			return result;
 
-	begin_page_table +=  num_pages;
+
+		/*Updates at the End of the Loop*/
+		map_to_addr +=  num_pages;
+		map_from_addr = (map_from_addr >> PAGE_SHIFT) + num_pages;
+		num_pages_rem = num_pages_rem - num_pages;
+		
+	/*Loop Ends here. Iterate with the above Changed behaviours*/
 	
-	if (copy_to_user(&args.page_table_addr, &map_to_addr, sizeof(unsigned long)*tot_num_pages))
+	
+	/*Maximum of 512.. Should be present in PMD loop*/
+	if (copy_to_user(&args->page_table_addr, &begin_page_table, sizeof(unsigned long)*tot_num_pages))
 		return -EINVAL;
 	
 	
