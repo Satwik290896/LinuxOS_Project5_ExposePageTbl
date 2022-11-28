@@ -147,7 +147,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 
 		/*Updates at the End of the Loop*/
 		map_to_addr +=  num_pages;
-		map_from_addr = (map_from_addr >> PAGE_SHIFT) + num_pages;
+		map_from_addr = ((map_from_addr >> PAGE_SHIFT) + num_pages) << PAGE_SHIFT;
 		num_pages_rem = num_pages_rem - num_pages;
 		
 	/*Loop Ends here. Iterate with the above Changed behaviours*/
