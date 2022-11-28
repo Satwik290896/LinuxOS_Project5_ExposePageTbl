@@ -127,8 +127,9 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	for (int i = 0; i <= num_pmds; i++) {
 		bool break_end = false;
 		int npage = 0; 
+		
 		/*Loop starts from here?*/
-		while (((map_to_addr - begin_page_table) < 512) && (!break_end)) {
+		while (!break_end) {
 			/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
 			pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
 			p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
