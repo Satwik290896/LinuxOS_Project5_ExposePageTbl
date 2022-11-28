@@ -67,30 +67,29 @@ SYSCALL_DEFINE1(get_pagetable_layout, struct pagetable_layout_info __user *, pgt
 SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *, args)
 {
 	struct expose_pgtbl_args local_args;
-	struct task_struct *from_task = current;
-	struct mm_struct *from_mm;
+	struct task_struct *to_task = current;
+	struct task_struct *from_task;
 	struct mm_struct *to_mm;
-	struct vm_area_struct *to_vma;
-	unsigned long map_from_addr, map_to_addr;
+	struct mm_struct *from_mm;
+	struct vm_area_struct *from_vma;
+	unsigned long map_from_addr, map_to_addr, map_begin_addr, map_end_addr, begin_page_table;
 	pgprot_t flags;
 	int result = 0;
 
-	pgd_t *fake_pgd;
-	p4d_t *fake_p4d;
-	pud_t *fake_pud;
-	pmd_t *fake_pmd;
-	p4d_t *p4d_e;
-	pud_t *pud_e;
-	pmd_t *pmd_e;
-	pte_t *pte_e;
+	unsigned long map_pfn;
+	unsigned long num_pmds, num_puds, num_pgds, tot_num_pages;
 
 	if (!args)
 		return -EINVAL;
 	if (copy_from_user(&local_args, args, sizeof(struct expose_pgtbl_args)))
 		return -EFAULT;
-
+		
+	
 	if (pid != -1)
 		from_task = find_task_by_vpid(pid);
+	else
+		from_task = current;
+
 	if (!from_task || !current)
 		return -ESRCH;
 
@@ -98,56 +97,57 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	if (!from_mm)
 		return -ESRCH;
 
-	to_mm = get_task_mm_expose(current);
+	to_mm = get_task_mm_expose(to_task);
 	if (!to_mm)
 		return -ESRCH;
 
-	/* TODO: copy the page tables */
-	fake_pgd->pgd = local_args.fake_pgd;
-	fake_p4d->pgd.pgd = local_args.fake_p4ds;
-	fake_pud->pud = local_args.fake_puds;
-	fake_pmd->pmd = local_args.fake_pmds;
-	map_to_addr = local_args.page_table_addr;
 
-	p4d_e = p4d_alloc(to_mm, fake_pgd, map_to_addr);
-	p4d_e->pgd.pgd = local_args.fake_p4ds;
-	pud_e = pud_alloc(to_mm, p4d_e, map_to_addr);
-	pud_e->pud = local_args.fake_puds;
-	pmd_e = pmd_alloc(to_mm, pud_e, map_to_addr);
-	pmd_e->pmd = local_args.fake_pmds;
-	pte_e = pte_alloc_map(to_mm, pmd_e, map_to_addr);
-	pte_e->pte = map_to_addr;
 
-	/* do the mapping from the VMA to page_table_addr*/
-	map_from_addr = local_args.begin_vaddr;
+	map_begin_addr = local_args.begin_vaddr;
+	map_end_addr = local_args.end_vaddr;
+	begin_page_table = local_args.page_table_addr;
+	
+	tot_num_pages = (map_end_addr >> PAGE_SHIFT - map_begin_addr>>PAGE_SHIFT) + 1;
+	num_pmds = (map_end_addr >> PMD_SHFT - map_begin_addr>>PMD_SHIFT) + 1;
+	num_puds = (map_end_addr >> PUD_SHFT - map_begin_addr>>PUD_SHIFT) + 1;
+	num_pgds = (map_end_addr >> PGD_SHFT - map_begin_addr>>PGD_SHIFT) + 1;
 
-	to_vma = find_vma(to_mm, local_args.page_table_addr);
+	to_vma = find_vma(to_mm, begin_page_table);
 	flags = to_vma->vm_page_prot;
 
-	while (PAGE_ALIGN(map_from_addr) < PAGE_ALIGN(local_args.end_vaddr)) {
-		/* walk the tables to get the physical PFN to map from */
-		/* TODO: should we use the fake tables for this? */
-		unsigned long map_pfn;
-		pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
-		p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
-		pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
-		pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
+	
+	map_from_addr = map_begin_addr;
+	
+	pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
+	p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
+	pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
+	pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
+	
+	
+	
+	
+	unsigned long pte_i = pte_index(map_from_addr);
+	map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
+	map_to_addr = begin_page_table;
+	
+	unsigned long num_pages = (512 - pte_i);
+	
+	if (num_pages > tot_num_pages)
+		num_pages = tot_num_pages;
+	
+	result = remap_pfn_range(to_vma, map_to_addr,
+				map_pfn, (num_pages*8), flags);
+	
+	if (!result)
+		return result;
 
-		#ifdef CONFIG_ARM64
-		map_pfn = (pmd_val(READ_ONCE(*map_pmd)) & ((1UL << 48) - 1)) >> PAGE_SHIFT;
-		#else
-		map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
-		#endif
+	begin_page_table +=  num_pages;
+	
+	if (copy_to_user(&args.page_table_addr, &map_to_addr, sizeof(unsigned long)*tot_num_pages))
+		return -EINVAL;
+	
+	
 
-		result = remap_pfn_range(to_vma, map_to_addr,
-					 map_pfn, PAGE_SIZE, flags);
-		if (result != 0)
-			return result;
-
-		map_from_addr = PAGE_ALIGN(map_from_addr + PAGE_SIZE);
-		map_to_addr = PAGE_ALIGN(map_to_addr + PAGE_SIZE);
-		to_vma = find_vma(to_mm, map_to_addr);
-	}
 
 	return 0;
 }
