@@ -120,10 +120,10 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	
 	
 	map_from_addr = map_begin_addr;
+	int i,j;
 	
-	
-	for (int j = 0; j < num_puds; j++) {
-		for (int i = 0; i < num_pmds; i++) {
+	for (j = 0; j < num_puds; j++) {
+		for (i = 0; i < num_pmds; i++) {
 
 			map_to_addr = begin_page_table;
 			/*Loop starts from here?*/
@@ -150,17 +150,17 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		}
 	}
 	
-	unsigned long copy_pmd = local_args.fake_pmds + pmd_index(map_begin_addr);`
+	unsigned long copy_pmd = local_args.fake_pmds + pmd_index(map_begin_addr);
 	
 	if (copy_to_user(&args->fake_pmds, &copy_pmd, sizeof(unsigned long)))
 		return -EINVAL;
 			
-	unsigned long copy_pud = local_args.fake_puds + pud_index(map_begin_addr);`
+	unsigned long copy_pud = local_args.fake_puds + pud_index(map_begin_addr);
 	
 	if (copy_to_user(&args->fake_puds, &copy_pud, sizeof(unsigned long)))
 		return -EINVAL;
 		
-	unsigned long copy_pgd = local_args.fake_pgd + pgd_index(map_begin_addr);`
+	unsigned long copy_pgd = local_args.fake_pgd + pgd_index(map_begin_addr);
 	
 	if (copy_to_user(&args->fake_pgd, &copy_pgd, sizeof(unsigned long)))
 		return -EINVAL;
