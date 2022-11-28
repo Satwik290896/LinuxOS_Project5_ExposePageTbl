@@ -121,13 +121,13 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	
 	
 	map_from_addr = map_begin_addr;
-	map_to_addr = begin_page_table;
+	
 	
 	
 	for (int i = 0; i <= num_pmds; i++) {
 		bool break_end = false;
 		int npage = 0; 
-		
+		map_to_addr = begin_page_table;
 		/*Loop starts from here?*/
 		while (!break_end) {
 			/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
@@ -160,11 +160,13 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 			npage += num_pages;
 		}
 		/*Loop Ends here. Iterate with the above Changed behaviours*/
-	
+		
 	
 		/*Maximum of 512.. Should be present in PMD loop*/
 		if (copy_to_user(&args->page_table_addr, &begin_page_table, sizeof(unsigned long)*npage))
 			return -EINVAL;
+
+		begin_page_table = begin_page_table + 512;
 	}
 	
 	
