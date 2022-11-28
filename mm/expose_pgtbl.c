@@ -142,7 +142,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		
 
 			/*Updates at the End of the Loop*/
-			map_to_addr +=  512;
+			map_to_addr +=  PAGE_SIZE;
 			map_from_addr = ((map_from_addr >> PAGE_SHIFT) + 512) << PAGE_SHIFT;
 		
 			/*Loop Ends here. Iterate with the above Changed behaviours*/
@@ -173,5 +173,5 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 SYSCALL_DEFINE1(get_pa_contents, long, phys_addr)
 {
 	/* This may need to be tested and revised after 442 is done for further testing */
-	return *((int *)__va(phys_addr));
+	return *((char *)__va(phys_addr));
 }
