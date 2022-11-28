@@ -122,8 +122,8 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	map_from_addr = map_begin_addr;
 	
 	
-	for (int j = 0; j <= num_puds; j++) {
-		for (int i = 0; i <= num_pmds; i++) {
+	for (int j = 0; j < num_puds; j++) {
+		for (int i = 0; i < num_pmds; i++) {
 
 			map_to_addr = begin_page_table;
 			/*Loop starts from here?*/
