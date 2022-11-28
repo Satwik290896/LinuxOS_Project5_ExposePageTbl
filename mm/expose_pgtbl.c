@@ -123,39 +123,49 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	map_from_addr = map_begin_addr;
 	map_to_addr = begin_page_table;
 	
-	/*Loop starts from here?*/
 	
-		/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
-		pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
-		p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
-		pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
-		pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
-		map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
+	for (int i = 0; i <= num_pmds; i++) {
+		bool break_end = false;
+		int npage = 0; 
+		/*Loop starts from here?*/
+		while (((map_to_addr - begin_page_table) < 512) && (!break_end)) {
+			/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
+			pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
+			p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
+			pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
+			pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
+			map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
 	
-		/*Find the pte index and compare with num_page_rem()*/
-		unsigned long pte_i = pte_index(map_from_addr);
-		unsigned long num_pages = (512 - pte_i);
-		if (num_pages > num_pages_rem)
-			num_pages = num_pages_rem;
+			/*Find the pte index and compare with num_page_rem()*/
+			unsigned long pte_i = pte_index(map_from_addr);
+			unsigned long num_pages_1 = (512 - pte_i);
+			unsigned long num_pages_2 = (512 - (map_to_addr - begin_page_table));
+			unsigned long num_pages = (num_pages_1 < num_pages_2)? num_pages_1 : num_pages_2;
+			if (num_pages > num_pages_rem)
+				num_pages = num_pages_rem;
+			else
+				break_end = true;
 	
-	
-		/*remap_pfn_range()*/
-		result = remap_pfn_range(to_vma, map_to_addr, map_pfn, (num_pages*8), flags);
-		if (!result)
-			return result;
+			/*remap_pfn_range()*/
+			result = remap_pfn_range(to_vma, map_to_addr, map_pfn, (num_pages*8), flags);
+			if (!result)
+				return result;
 
 
-		/*Updates at the End of the Loop*/
-		map_to_addr +=  num_pages;
-		map_from_addr = ((map_from_addr >> PAGE_SHIFT) + num_pages) << PAGE_SHIFT;
-		num_pages_rem = num_pages_rem - num_pages;
-		
-	/*Loop Ends here. Iterate with the above Changed behaviours*/
+			/*Updates at the End of the Loop*/
+			map_to_addr +=  num_pages;
+			map_from_addr = ((map_from_addr >> PAGE_SHIFT) + num_pages) << PAGE_SHIFT;
+			num_pages_rem = num_pages_rem - num_pages;
+			npage += num_pages;
+		}
+		/*Loop Ends here. Iterate with the above Changed behaviours*/
 	
 	
-	/*Maximum of 512.. Should be present in PMD loop*/
-	if (copy_to_user(&args->page_table_addr, &begin_page_table, sizeof(unsigned long)*tot_num_pages))
-		return -EINVAL;
+		/*Maximum of 512.. Should be present in PMD loop*/
+		if (copy_to_user(&args->page_table_addr, &begin_page_table, sizeof(unsigned long)*npage))
+			return -EINVAL;
+	}
+	
 	
 	
 
