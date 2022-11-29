@@ -84,8 +84,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		return -EINVAL;
 	if (copy_from_user(&local_args, args, sizeof(struct expose_pgtbl_args)))
 		return -EFAULT;
-		
-	
+
 	if (pid != -1)
 		from_task = find_task_by_vpid(pid);
 	else
@@ -107,7 +106,7 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	map_begin_addr = local_args.begin_vaddr;
 	map_end_addr = local_args.end_vaddr;
 	begin_page_table = local_args.page_table_addr;
-	
+
 	tot_num_pages = (map_end_addr >> PAGE_SHIFT) - (map_begin_addr>>PAGE_SHIFT) + 1;
 	num_pmds = (map_end_addr >> PMD_SHIFT) - (map_begin_addr>>PMD_SHIFT) + 1;
 	num_puds = (map_end_addr >> PUD_SHIFT) - (map_begin_addr>>PUD_SHIFT) + 1;
@@ -116,57 +115,54 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	to_vma = find_vma(to_mm, begin_page_table);
 	flags = PAGE_READONLY;
 
-	
-	
-	
+
 	map_from_addr = map_begin_addr;
-	int i,j;
+	int i, j;
+
 	map_to_addr = begin_page_table;
-	
+
 	for (j = 0; j < num_puds; j++) {
 		for (i = 0; i < num_pmds; i++) {
-
-			
 			/*Loop starts from here?*/
-		
+
 			/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
 			pgd_t *map_pgd = pgd_offset(from_mm, map_from_addr);
 			p4d_t *map_p4d = p4d_offset(map_pgd, map_from_addr);
 			pud_t *map_pud = pud_offset(map_p4d, map_from_addr);
 			pmd_t *map_pmd = pmd_offset(map_pud, map_from_addr);
+
 			map_pfn = pmd_pfn(READ_ONCE(*map_pmd));
-	
+
 			/*remap_pfn_range()*/
 			result = remap_pfn_range(to_vma, map_to_addr, map_pfn, PAGE_SIZE, flags);
 			if (!result)
 				return result;
-		
 
 			/*Updates at the End of the Loop*/
 			if (!((i == num_pmds-1) && (j == num_puds-1))) {
 				map_to_addr +=  PAGE_SIZE;
 				map_from_addr = ((map_from_addr >> PAGE_SHIFT) + 512) << PAGE_SHIFT;
 			}
-		
+
 			/*Loop Ends here. Iterate with the above Changed behaviours*/
-	
 		}
 	}
-	
+
 	unsigned long copy_pmd = pmd_index(map_begin_addr);
+
 	local_args.fake_pmds += copy_pmd*8;
 
 	unsigned long copy_pud = pud_index(map_begin_addr);
+
 	local_args.fake_puds += copy_pud*8;
-		
+
 	unsigned long copy_pgd = pgd_index(map_begin_addr);
+
 	local_args.fake_pgd += copy_pgd*8;
-	
+
 	/*Copy only the offsets*/
 	if (copy_to_user(args, &local_args, sizeof(struct expose_pgtbl_args)))
 		return -EINVAL;
-		
-		
 
 	return 0;
 }
