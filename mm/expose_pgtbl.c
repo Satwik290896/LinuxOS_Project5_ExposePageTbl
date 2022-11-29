@@ -71,14 +71,15 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	struct task_struct *from_task;
 	struct mm_struct *to_mm;
 	struct mm_struct *from_mm;
-	struct vm_area_struct *from_vma;
 	struct vm_area_struct *to_vma;
 	unsigned long map_from_addr, map_to_addr, map_begin_addr, map_end_addr, begin_page_table;
 	pgprot_t flags;
 	int result = 0;
 
 	unsigned long map_pfn;
-	unsigned long num_pmds, num_puds, num_pgds, tot_num_pages, num_pages_rem;
+	unsigned long num_pmds, num_puds, num_pgds, tot_num_pages;
+	unsigned long copy_pmd, copy_pud, copy_pgd;
+	int i, j;
 
 	if (!args)
 		return -EINVAL;
@@ -117,8 +118,6 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 
 
 	map_from_addr = map_begin_addr;
-	int i, j;
-
 	map_to_addr = begin_page_table;
 
 	for (j = 0; j < num_puds; j++) {
@@ -148,16 +147,11 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		}
 	}
 
-	unsigned long copy_pmd = pmd_index(map_begin_addr);
-
+	copy_pmd = pmd_index(map_begin_addr);
 	local_args.fake_pmds += copy_pmd*8;
-
-	unsigned long copy_pud = pud_index(map_begin_addr);
-
+	copy_pud = pud_index(map_begin_addr);
 	local_args.fake_puds += copy_pud*8;
-
-	unsigned long copy_pgd = pgd_index(map_begin_addr);
-
+	copy_pgd = pgd_index(map_begin_addr);
 	local_args.fake_pgd += copy_pgd*8;
 
 	/*Copy only the offsets*/
