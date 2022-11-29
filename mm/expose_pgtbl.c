@@ -114,18 +114,19 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 	num_pgds = 1;
 
 	to_vma = find_vma(to_mm, begin_page_table);
-	flags = to_vma->vm_page_prot;
+	flags = PAGE_READONLY;
 
 	
 	
 	
 	map_from_addr = map_begin_addr;
 	int i,j;
+	map_to_addr = begin_page_table;
 	
 	for (j = 0; j < num_puds; j++) {
 		for (i = 0; i < num_pmds; i++) {
 
-			map_to_addr = begin_page_table;
+			
 			/*Loop starts from here?*/
 		
 			/*Find map_pfn using pmd_pfn() of the "map_from_addr"*/
@@ -142,27 +143,27 @@ SYSCALL_DEFINE2(expose_page_table, pid_t, pid, struct expose_pgtbl_args __user *
 		
 
 			/*Updates at the End of the Loop*/
-			map_to_addr +=  PAGE_SIZE;
-			map_from_addr = ((map_from_addr >> PAGE_SHIFT) + 512) << PAGE_SHIFT;
+			if (!((i == num_pmds-1) && (j == num_puds-1))) {
+				map_to_addr +=  PAGE_SIZE;
+				map_from_addr = ((map_from_addr >> PAGE_SHIFT) + 512) << PAGE_SHIFT;
+			}
 		
 			/*Loop Ends here. Iterate with the above Changed behaviours*/
 	
 		}
 	}
 	
-	unsigned long copy_pmd = local_args.fake_pmds + pmd_index(map_begin_addr);
-	
-	if (copy_to_user(&args->fake_pmds, &copy_pmd, sizeof(unsigned long)))
-		return -EINVAL;
-			
-	unsigned long copy_pud = local_args.fake_puds + pud_index(map_begin_addr);
-	
-	if (copy_to_user(&args->fake_puds, &copy_pud, sizeof(unsigned long)))
-		return -EINVAL;
+	unsigned long copy_pmd = pmd_index(map_begin_addr);
+	local_args.fake_pmds += copy_pmd*8;
+
+	unsigned long copy_pud = pud_index(map_begin_addr);
+	local_args.fake_puds += copy_pud*8;
 		
-	unsigned long copy_pgd = local_args.fake_pgd + pgd_index(map_begin_addr);
+	unsigned long copy_pgd = pgd_index(map_begin_addr);
+	local_args.fake_pgd += copy_pgd*8;
 	
-	if (copy_to_user(&args->fake_pgd, &copy_pgd, sizeof(unsigned long)))
+	/*Copy only the offsets*/
+	if (copy_to_user(args, &local_args, sizeof(struct expose_pgtbl_args)))
 		return -EINVAL;
 		
 		
